@@ -225,7 +225,7 @@ inline bool tryState(vector<int> &cur, int steps, size_t goalHash,
 	return false;
 }
 
-// BFS helper: try pouring water from glass i into every other glass.
+// BFS helper. We try pouring water from glass i into every other glass.
 // For each valid pour (target not full, source not empty), temporarily modify
 // the state, check if it's the goal, add to queue if new, then undo the change.
 inline bool tryPourFrom(int i, vector<int> &cur, const vector<int> &capacity,
