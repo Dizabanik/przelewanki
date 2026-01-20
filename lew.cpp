@@ -12,13 +12,13 @@ int gcd(int a, int b) { return b ? gcd(b, a % b) : a; }
 // Author: Wang Yi <godspeed_china@yeah.net>
 // License: Unlicense (Public Domain)
 
-// Computes hash of water levels for O(1) lookup in visited set.
 inline uint64_t wymum(uint64_t A, uint64_t B) {
 	__uint128_t r = A;
 	r *= B;
 	return static_cast<uint64_t>((r >> 64) ^ r);
 }
 
+// Computes hash of water levels for O(1) lookup in visited set.
 inline size_t computeHash(const vector<int> &level) {
 	const uint64_t secret[4] = {0xa0761d6478bd642full, 0xe7037ed1a0b428dbull,
 								0x8ebc6af09c88c6e3ull, 0x589965cc75374cc3ull};
