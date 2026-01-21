@@ -183,7 +183,7 @@ int64_t solveForTwo(int a, int b, int ta, int tb) {
 		// (a, tb): A full, B has tb
 		best = min(best, countOps<EndMode::TO_EMPTY>(a, b, tb) + 1);
 		best = min(best, countOps<EndMode::FROM_EMPTY>(b, a, tb) + 1);
-		// A gets full naturally when pouring B→A: need (a+tb) water total
+		// A gets full naturally when pouring B->A: need (a+tb) water total
 		if ((a + tb) % b == 0) {
 			int64_t k = (a + tb) / b;
 			best = min(best, 2 * k);
