@@ -7,9 +7,7 @@
 #include <vector>
 using namespace std;
 
-using ll = long long;
-
-ll gcd(ll a, ll b) { return b ? gcd(b, a % b) : a; }
+int64_t gcd(int64_t a, int64_t b) { return b ? gcd(b, a % b) : a; }
 
 // Hash function based on wyhash by Wang Yi
 // Source: https://github.com/wangyi-fudan/wyhash
@@ -38,7 +36,7 @@ inline size_t computeHash(const vector<int> &level) {
 // 2) at least one glass must end up full or empty
 bool canPossiblyReach(const vector<int> &capacity, const vector<int> &target) {
 	int n = static_cast<int>(capacity.size());
-	ll g = 0;
+	int64_t g = 0;
 	for (int i = 0; i < n; i++)
 		g = gcd(g, capacity[i]);
 	for (int i = 0; i < n; i++)
@@ -69,11 +67,11 @@ int solveIfTrivial(const vector<int> &capacity, const vector<int> &target) {
 // Computes modular inverse using the extended Euclidean algorithm.
 // Returns x such that (val * x) % mod == 1.
 // Based on: https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm
-ll modInverse(ll val, ll mod) {
-	ll x0 = 0, x1 = 1, a = val, b = mod;
+int64_t modInverse(int64_t val, int64_t mod) {
+	int64_t x0 = 0, x1 = 1, a = val, b = mod;
 	while (a > 1 && b > 0) {
-		ll q = a / b;
-		ll tmp = b;
+		int64_t q = a / b;
+		int64_t tmp = b;
 		b = a - q * b;
 		a = tmp;
 		tmp = x0;
@@ -83,82 +81,77 @@ ll modInverse(ll val, ll mod) {
 	return ((x1 % mod) + mod) % mod;
 }
 
-// Count ops when target ends up in the "to" jug (the one we pour into).
-// k fills of "from", j empties of "to", with a pour after each. Formula: 2k +
-// 2j
-ll countOpsTargetInTo(ll from, ll to, ll target) {
-	if (target == 0)
-		return 0;
-	if (target == to)
-		return 1;
+// Ending mode for the countOps function. Determines where the target ends up
+// and the state of the other jug at the end of the operation chain.
+enum class EndMode {
+	// TO_EMPTY: target ends in "to" jug (the one we pour into), "from" is
+	// empty.
+	// k fills of "from", j empties of "to", with a pour after each.
+	// Formula: 2k + 2j
+	TO_EMPTY,
 
-	ll d = gcd(from, to);
-	if (target % d != 0)
-		return LLONG_MAX;
+	// FROM_EMPTY: target ends in "from" jug (the one we fill), "to" is empty.
+	// Formula: 2k + 2j - 1 (last empty leaves target in place, so there is no
+	// final pour)
+	FROM_EMPTY,
 
-	ll fd = from / d, td = to / d, tgt = target / d;
-	ll inv = modInverse(fd, td);
-	ll k = (tgt * inv) % td;
-	if (k == 0)
-		k = td;
-
-	ll j = (k * from - target) / to;
-	return 2 * k + 2 * j;
-}
-
-// Count ops when target ends up in the "from" jug (the one we fill).
-// Formula: 2k + 2j - 1 (last empty leaves target in place, so there is no final
-// pour)
-ll countOpsTargetInFrom(ll from, ll to, ll target) {
-	if (target == 0)
-		return 0;
-	if (target == from)
-		return 1;
-
-	ll d = gcd(from, to);
-	if (target % d != 0)
-		return LLONG_MAX;
-
-	ll fd = from / d, td = to / d, tgt = target / d;
-	ll inv = modInverse(fd, td);
-	ll k = (tgt * inv) % td;
-	if (k == 0)
-		k = td;
-
-	ll j = (k * from - target) / to;
-	return 2 * k + 2 * j - 1;
-}
-
-// Count ops when target ends in "from" jug but "to" jug ends FULL (not empty).
-// Formula: 2k + 2j (last pour fills "to" jug completely)
-ll countOpsTargetInFromToFull(ll from, ll to, ll target) {
-	if (target == 0)
-		return 0;
-	if (target == from)
-		return 1;
-
-	ll d = gcd(from, to);
-	if (target % d != 0)
-		return LLONG_MAX;
-
-	ll fd = from / d, td = to / d, tgt = target / d;
-	ll inv = modInverse(fd, td);
-	ll k = (tgt * inv) % td;
-	if (k == 0)
-		k = td;
-
+	// FROM_TO_FULL: target ends in "from" jug, but "to" jug ends FULL (not
+	// empty).
+	// Formula: 2k + 2j (last pour fills "to" jug completely).
 	// At the end, "from" holds target and "to" is full.
 	// Total water = target + to, so we need k*from - j*to = target + to.
-	ll j = (k * from - target - to) / to;
-	if (j < 0)
-		return LLONG_MAX; // not achievable with this k
-	return 2 * k + 2 * j;
+	FROM_TO_FULL
+};
+
+// Count minimum operations to achieve target in one jug.
+// EndMode determines which jug holds the target and the other jug's state.
+// We fill "from" k times and empty "to" j times.
+// Each fill/empty is followed by a pour, giving 2k + 2j total ops.
+// (minus 1 if the last action is an empty, since no pour follows).
+template <EndMode mode>
+int64_t countOps(int64_t from, int64_t to, int64_t target) {
+	if (target == 0)
+		return 0;
+
+	// If target equals the jug we're targeting, just one fill
+	if constexpr (mode == EndMode::TO_EMPTY) {
+		if (target == to)
+			return 1;
+	} else {
+		if (target == from)
+			return 1;
+	}
+
+	int64_t d = gcd(from, to);
+	if (target % d != 0)
+		return LLONG_MAX;
+
+	int64_t fd = from / d, td = to / d, tgt = target / d;
+	int64_t inv = modInverse(fd, td);
+	int64_t k = (tgt * inv) % td;
+	if (k == 0)
+		k = td;
+
+	int64_t j;
+	if constexpr (mode == EndMode::FROM_TO_FULL) {
+		j = (k * from - target - to) / to;
+		if (j < 0)
+			return LLONG_MAX; // not achievable with this k
+		return 2 * k + 2 * j;
+	} else {
+		j = (k * from - target) / to;
+		if constexpr (mode == EndMode::FROM_EMPTY) {
+			return 2 * k + 2 * j - 1; // no final pour
+		} else {
+			return 2 * k + 2 * j;
+		}
+	}
 }
 
 // For exactly 2 glasses, compute minimum operations using the water jug
 // formulas. This avoids BFS which would be too slow for large capacities. We
 // try all valid strategies and return the minimum operations.
-ll solveForTwo(int a, int b, int ta, int tb) {
+int64_t solveForTwo(int a, int b, int ta, int tb) {
 	if (ta == 0 && tb == 0)
 		return 0;
 	if (ta == a && tb == b)
@@ -168,50 +161,54 @@ ll solveForTwo(int a, int b, int ta, int tb) {
 	if (ta == 0 && tb == b)
 		return 1;
 
-	ll best = LLONG_MAX;
+	int64_t best = LLONG_MAX;
 
 	if (ta == 0) {
 		// (0, tb): A empty, B has tb
-		best = min(best, countOpsTargetInTo(a, b, tb));	  // fill A, pour to B
-		best = min(best, countOpsTargetInFrom(b, a, tb)); // fill B, pour to A
+		best = min(best,
+				   countOps<EndMode::TO_EMPTY>(a, b, tb)); // fill A, pour to B
+		best = min(
+			best, countOps<EndMode::FROM_EMPTY>(b, a, tb)); // fill B, pour to A
 	}
 
 	if (tb == 0) {
 		// (ta, 0): A has ta, B empty
-		best = min(best, countOpsTargetInTo(b, a, ta));	  // fill B, pour to A
-		best = min(best, countOpsTargetInFrom(a, b, ta)); // fill A, pour to B
+		best = min(best,
+				   countOps<EndMode::TO_EMPTY>(b, a, ta)); // fill B, pour to A
+		best = min(
+			best, countOps<EndMode::FROM_EMPTY>(a, b, ta)); // fill A, pour to B
 	}
 
 	if (ta == a) {
 		// (a, tb): A full, B has tb
-		best = min(best, countOpsTargetInTo(a, b, tb) + 1);
-		best = min(best, countOpsTargetInFrom(b, a, tb) + 1);
+		best = min(best, countOps<EndMode::TO_EMPTY>(a, b, tb) + 1);
+		best = min(best, countOps<EndMode::FROM_EMPTY>(b, a, tb) + 1);
 		// A gets full naturally when pouring B→A: need (a+tb) water total
 		if ((a + tb) % b == 0) {
-			ll k = (a + tb) / b;
+			int64_t k = (a + tb) / b;
 			best = min(best, 2 * k);
 		}
-		// B has tb, A ends full after last pour (fill B, pour to A strategy)
-		best = min(best, countOpsTargetInFromToFull(b, a, tb));
+		// B has tb, A ends full after last pour (fill B, pour to A)
+		best = min(best, countOps<EndMode::FROM_TO_FULL>(b, a, tb));
 	}
 
 	if (tb == b) {
 		// (ta, b): A has ta, B full
-		best = min(best, countOpsTargetInTo(b, a, ta) + 1);
-		best = min(best, countOpsTargetInFrom(a, b, ta) + 1);
-		// B gets full naturally when pouring A→B: need (b+ta) water total
+		best = min(best, countOps<EndMode::TO_EMPTY>(b, a, ta) + 1);
+		best = min(best, countOps<EndMode::FROM_EMPTY>(a, b, ta) + 1);
+		// B gets full naturally when pouring A->B: need (b+ta) water total
 		if ((b + ta) % a == 0) {
-			ll k = (b + ta) / a;
+			int64_t k = (b + ta) / a;
 			best = min(best, 2 * k);
 		}
 		// A has ta, B ends full after last pour (fill A, pour to B strategy)
-		best = min(best, countOpsTargetInFromToFull(a, b, ta));
+		best = min(best, countOps<EndMode::FROM_TO_FULL>(a, b, ta));
 	}
 
 	return best;
 }
 
-// Try a new state: if it's the goal return true, otherwise add to queue
+// Try a new state. If it's the goal return true, otherwise add to queue
 inline bool tryState(vector<int> &cur, int steps, size_t goalHash,
 					 unordered_set<size_t> &visited,
 					 queue<pair<vector<int>, int>> &q, int &result) {
@@ -324,7 +321,7 @@ inline void readInput(vector<int> &capacity, vector<int> &target) {
 	}
 }
 
-// Check if target is all zeros (already satisfied)
+// Check if target is all zeros
 inline bool isAlreadyAtTarget(const vector<int> &target) {
 	for (int val : target)
 		if (val != 0)
@@ -333,8 +330,7 @@ inline bool isAlreadyAtTarget(const vector<int> &target) {
 }
 
 // Main solver. It returns minimum operations to reach target state, or -1 if
-// impossible. Uses mathematical pruning, trivial case detection, closed-form
-// for n=2, and BFS for n>=3.
+// impossible.
 int solve(const vector<int> &capacity, const vector<int> &target) {
 	if (capacity.empty() || isAlreadyAtTarget(target))
 		return 0;
@@ -346,7 +342,8 @@ int solve(const vector<int> &capacity, const vector<int> &target) {
 		return trivialAnswer;
 
 	if (capacity.size() == 2) {
-		ll ans = solveForTwo(capacity[0], capacity[1], target[0], target[1]);
+		int64_t ans =
+			solveForTwo(capacity[0], capacity[1], target[0], target[1]);
 		return static_cast<int>(ans);
 	}
 	return bfsSolve(capacity, target);
